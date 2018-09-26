@@ -9,41 +9,124 @@ from threading import Thread
 import sys
 import time
 from socket import *
+from datetime import datetime
+import os
+
+
 
 #
-#Script created 8/28/18
-#Last modified 9/04/18
+#Script created 9/06/18
+#Last modified 9/21/18
 #
 #This script fingerprints a remote device. It returns
-#information about the device's os and configs.
+#information about the device's os and juniper configs.
 #
-#This script must be ran with sudo-
-#$>sudo python run.remote.os.and.cli.cmds.py
+#This script is ran using sudo-
+#$> sudo python gather.device.info.py
 #
 #
 #Script tested successfully against the following devices-
 #
-#
 
 
+
+#----------------------------------
 
 #SSH creds.
 #Uncomment the ip address matching your device or add a new one.
-#remoteip = "192.168.1.8"
-remoteip = "192.168.1.1"
+#Change user id and pwd as needed.
+
+##sdfsdf
+#remoteip = "1.1.1.1"
+#remoteuser = "user"
+#remotepassword = "something"
+
+##acd
+remoteip = "1.1.1.2"
 remoteuser = "root"
-remotepassword = "sdfsdfsd"
+remotepassword = "something"
+
+##abc
+remoteip = "1.1.1.3"
+remoteuser = "root"
+remotepassword = "something"
+
+
+
+#----------------------------------
 remotetimeout = 0
 
 
 
 
 
-#Print blank lines.
-def printtwolines():
-    print (" ")
-    print (" ")
 
+
+###Setup logging.
+
+#Create output file.
+outfile = open('command_output_'+datetime.now().strftime("%d%h%Y")+'.txt',"a+")
+
+
+#Add a timestamp
+def create_output_file():
+    #outfile = open('command_output_'+datetime.now().strftime("%d%h%Y")+'.txt',"a+")
+    outfile.write('\n')
+    outfile.write("This log entry was created on "+datetime.now().strftime("%d%h%Y")+" at "+datetime.now().strftime("%H:%M:%S"))
+    outfile.write('\n')
+    #return
+
+
+create_output_file()
+
+
+
+
+
+#Write to output file.
+def write_to_output_file(cmd_results):
+#def write_to_output_file():
+    #outfile.write("Hello World")
+    outfile.write(cmd_results)
+    outfile.write('\n')
+
+
+###End logging setup.
+
+
+
+
+
+
+
+###Check SSH target
+
+#Verify user provided an OS value.
+try:
+    #Target OS-Juniper, Ubuntu, FreeBSD, etc.
+    user_provided_os = sys.argv[1]
+except IndexError:
+    print " "
+    print "Target IP address is " + remoteip
+    print "A user can change it by editing the variable "'"remoteip"'" on line 33."
+    print " "
+    print """Usage:
+sudo python gather.device.info.py {--os} {Operating system}
+
+examples:
+sudo python gather.device.info.py --os juniper
+sudo python gather.device.info.py --os ubuntu
+sudo python gather.device.info.py --os cisco
+sudo python gather.device.info.py --os freebsd
+
+If you'd like this script to detect the remote 
+operating system {os} for you use the 'autodetect' argument.
+Example:
+sudo python gather.device.info.py --os autodetect
+
+    """
+
+    sys.exit()
 
 
 
@@ -61,19 +144,18 @@ def printthreelines():
 #Check IP address.
 def check_ipaddr(remoteip):
     s=socket(AF_INET,SOCK_STREAM)
-    s.settimeout(5)     #5 secomds.
+    s.settimeout(5)     #Five secomds
     try:
         s.connect((remoteip,22))
         print (" ")
         print "Successful SSH connection to %s" % (remoteip)
-        print (" ")
+        #command_output_saved ("Successful SSH connection to %s" % (remoteip))
         s.shutdown(2)
         return True
     except Exception as excmsg:
         print (" ")
         print ("Failed SSH connection to %s") % (remoteip)
         print "Reason - %s" % excmsg
-        print (" ")
         return False
         
 
@@ -106,26 +188,22 @@ def printdashedline():
 
 
 
-#Commas are mandatory. Otherwise each cmd will be parsed and sent one character at a time, instead of as one string.
-#Commands to execute on remote device, add support for ifconfig, df, cli/edit mode, etc
-#remoteoscommands = ('pwd', 'date', 'uname', 'who',)            #All commas is mandatory, otherwise each string will be parsed and sent character by character.
-#Remote OS commands.
+
+
+
+
+
+#Juniper OS commands.
 remoteoscommands = ('pwd',
         'date',
         'uname -a',
         'w',
         'id',
         'ls',
-        'netstat -nat | grep -i listen | grep 128.0.0.1',)     
+        'netstat -nat | grep -i listen | grep 128.0.0.1',)
 
 
-
-
-
-
-#http://rtodto.net/running-batch-commands-on-remote-junos-devices
-#read this author's py/paramiko code.
-#Remote CLI commands.
+#Juniper CLI commands.
 remoteclicommands = ('cli -c "show version brief"',
         'cli -c "show system uptime"',
         'cli -c "show chassis hardware"',
@@ -135,59 +213,70 @@ remoteclicommands = ('cli -c "show version brief"',
 
 
 
+def junos_commands_tot():
+    totcommands = len(remoteoscommands) + len(remoteclicommands)
+    print ("Command count")
+    print totcommands
 
 
 
-totcommands = len(remoteoscommands)
-printtwolines()
-print ("Command count")
-print totcommands
 
 
 
+#Ubuntu commands ran on remote device.
+remoteubuntucommands = ('uptime',
+    'uname -a',
+    'cat "/etc/issue"',
+    'pwd',
+    'whoami',)
 
-printdashedline()
-printtwolines()
+
+
+def ubuntu_commands_tot():
+    totcommands = len(remoteubuntucommands)
+    print ("Command count")
+    print totcommands
+
+
+
 
 
 
 
 def commandlistos():
     header = "These OS commands will be executed on the remote device."
-    #print "{0:{1}^10}".format(header, "-")
-    #print '{}'.format(remoteoscommands) 
     print (" ")
     print "{0:{1}^10}".format(header, "-")
     print (" ")
-    #print '{}'.format(remoteoscommands)
     for r in remoteoscommands:
         print '{}'.format(r)
 
 
 
-commandlistos()
-
-printdashedline()
-printtwolines()
-
-
-
+printthreelines()
 
 
 
 
 def commandlistcli():
-    header = "These CLI commands will be executed on the remote device."
+    header = "These Juniper CLI commands will be executed on the remote device."
     print (" ")
     print "{0:{1}^10}".format(header, "-")
     print (" ")
-    #print '{}'.format(remoteclicommands)
     for r in remoteclicommands:
         print '{}'.format(r)
 
 
 
-commandlistcli()
+
+
+def commandlistubuntu():
+    header = "These Ubuntu commands will be executed on the remote device."
+    print (" ")
+    print "{0:{1}^10}".format(header, "-")
+    print (" ")
+    for r in remoteubuntucommands:
+        print '{}'.format(r)
 
 
 
@@ -206,7 +295,7 @@ class ssh:
         self.client.set_missing_host_key_policy(client.AutoAddPolicy())
 
         #Make the connection.
-        #self.client.connect("192.168.1.1", username="root", password="sdfsdfd", look_for_keys="False", timeout=10)
+        #self.client.connect("192.168.1.1", username="root", password="Passw0rd!", look_for_keys="False", timeout=10)
         self.client.connect(remoteip, username=remoteuser, password=remotepassword, look_for_keys="False", timeout=10)
 
 
@@ -232,81 +321,68 @@ class ssh:
                         #Print command and results.
                         #print y
                         #Print as string with utf8 encoding
-                        #print(str(self.alldata))
                         print(str.strip(self.alldata))
+                        write_to_output_file(str.strip(self.alldata))
 
 
             else:
                 print("Connection not opened.")
             
+#End of ssh class
 
 
 
-
-
-
-###Begin OS commands
-
-
-#Make SSH connection.
-def connect(command):
+if user_provided_os in ['Juniper', 'juniper', 'JUNIPER']:
+    junos_commands_tot()
+    commandlistos()
+    commandlistcli()
     connection = ssh(remoteip, remoteuser, remotepassword, remotetimeout)
     connection.sendCommand(remoteoscommands)
-
-
-
-
-#Run remote os commands.
-print "Command results"
-loops = 0
-for command in remoteoscommands:
-    if loops < 1:
-        #print command
-        connect(command)
-        loops = 1
-
-
-printdashedline()
-
-
-
-
-###Begin CLI commands
-
-
-#Make SSH connection.
-def connect(command):
     connection = ssh(remoteip, remoteuser, remotepassword, remotetimeout)
     connection.sendCommand(remoteclicommands)
+    sys.exit()
+
+
+
+elif user_provided_os in ['ubuntu', 'Ubuntu', 'UBUNTU']:
+    ubuntu_commands_tot()
+    commandlistubuntu()
+    connection = ssh(remoteip, remoteuser, remotepassword, remotetimeout)
+    connection.sendCommand(remoteubuntucommands)
+    sys.exit()
 
 
 
 
-#Run remote cli commands.
-loops = 0
-for command in remoteclicommands:
-    if loops < 1:
-        #print command
-        connect(command)
-        loops = 1
+elif user_provided_os in ['cisco', 'Cisco', 'CISCO']:
+    print ("Cisco was selected.")
+    printthreelines()
+    sys.exit()
 
 
 
+elif user_provided_os in ['FreeBSD', 'freebsd', 'freeBSD', 'FREEBSD', 'BSD']:
+    print ("FreeBSD was selected.")
+    printthreelines()
+    sys.exit()
 
 
-###End of OS commands
+
+elif user_provided_os in ['autodetect', 'Autodetect', 'AUTODETECT', 'auto']:
+    print ("User has requested 'Autodetect'")
+    printthreelines()
+    sys.exit()
 
 
 
-#Begin other CLI commands
+else:
+    sys.exit()
 
 
-printtwolines()
 
+printthreelines()
 
+outfile.close()
 
 exit()
-
-
-
 
